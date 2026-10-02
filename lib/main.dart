@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+List<Map<String, dynamic>> cartItems = [];
+
 void main() {
   runApp(const CoffeeShopApp());
 }
@@ -93,7 +95,22 @@ class _HomePageState extends State<HomePage> {
   ];
 
   String selectedCategory = 'All';
+  String searchQuery = '';
   final List<String> categories = ['All', 'Hot', 'Cold', 'Special'];
+
+  String getCoffeeCategory(Coffee coffee) {
+    if (coffee.name == 'Espresso' || coffee.name == 'Americano') return 'Hot';
+    if (coffee.name == 'Cappuccino' || coffee.name == 'Latte') return 'Cold';
+    return 'Special';
+  }
+
+  List<Coffee> get filteredCoffees {
+    return coffees.where((coffee) {
+      final matchesSearch = coffee.name.toLowerCase().contains(searchQuery.toLowerCase());
+      final matchesCategory = selectedCategory == 'All' || getCoffeeCategory(coffee) == selectedCategory;
+      return matchesSearch && matchesCategory;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,6 +186,11 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   child: TextField(
+                    onChanged: (value) {
+                      setState(() {
+                        searchQuery = value;
+                      });
+                    },
                     decoration: InputDecoration(
                       hintText: 'Cari kopi favoritmu...',
                       prefixIcon: const Icon(Icons.search, color: Color(0xFF6F4E37)),
@@ -248,10 +270,10 @@ class _HomePageState extends State<HomePage> {
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
-                    final coffee = coffees[index];
+                    final coffee = filteredCoffees[index];
                     return CoffeeCard(coffee: coffee);
                   },
-                  childCount: coffees.length,
+                  childCount: filteredCoffees.length,
                 ),
               ),
             ),
@@ -669,18 +691,41 @@ class _DetailPageState extends State<DetailPage> {
         ),
         child: SafeArea(
           child: ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${widget.coffee.name} ditambahkan ke keranjang!'),
-                  backgroundColor: const Color(0xFF6F4E37),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              );
-            },
+onPressed: () {
+  final existingIndex = cartItems.indexWhere(
+    (item) =>
+        item['name'] == widget.coffee.name &&
+        item['size'] == selectedSize,
+  );
+
+  if (existingIndex != -1) {
+    cartItems[existingIndex]['quantity'] += quantity;
+  } else {
+    cartItems.add({
+      'name': widget.coffee.name,
+      'price': widget.coffee.price,
+      'quantity': quantity,
+      'image': widget.coffee.image,
+      'size': selectedSize,
+    });
+  }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(
+        '${widget.coffee.name} berhasil ditambahkan ke keranjang!',
+      ),
+      backgroundColor: const Color(0xFF6F4E37),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+
+  Navigator.popUntil(context, (route) => route.isFirst);
+},
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF6F4E37),
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -713,11 +758,6 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
-  List<Map<String, dynamic>> cartItems = [
-    {'name': 'Cappuccino', 'price': 32000, 'quantity': 2, 'image': '🥤'},
-    {'name': 'Latte', 'price': 30000, 'quantity': 1, 'image': '🍵'},
-  ];
-
   double get totalPrice {
     return cartItems.fold(0, (sum, item) => sum + (item['price'] * item['quantity']));
   }
